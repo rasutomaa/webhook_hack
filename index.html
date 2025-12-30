@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Webhook連投ツール</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; max-width: 500px; margin: 40px auto; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); background-color: #f9f9f9; }
+        h2 { text-align: center; color: #333; margin-bottom: 20px; }
+        label { display: block; margin-top: 15px; font-weight: bold; color: #555; }
+        input, textarea { width: 100%; padding: 10px; margin-top: 5px; box-sizing: border-box; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
+        .row { display: flex; gap: 10px; }
+        button { width: 100%; padding: 12px; margin-top: 25px; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; }
+        button:hover { background: #0056b3; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        #log { margin-top: 20px; font-size: 0.85em; height: 180px; overflow-y: auto; background: #fff; padding: 10px; border: 1px solid #eee; border-radius: 6px; }
+        .success { color: #28a745; border-left: 3px solid #28a745; padding-left: 5px; margin: 4px 0; }
+        .error { color: #dc3545; border-left: 3px solid #dc3545; padding-left: 5px; margin: 4px 0; }
+    </style>
+</head>
+<body>
+
+    <h2>Webhook 連投ツール</h2>
+
+    <label>Webhook URL</label>
+    <input type="text" id="webhookUrl" placeholder="https://discord.com/api/webhooks/...">
+
+    <label>表示名（ユーザー名）</label>
+    <input type="text" id="username" placeholder="ボットの名前を指定（空でもOK）">
+
+    <label>送信するメッセージ</label>
+    <textarea id="message" rows="3">テストメッセージ</textarea>
+
+    <div class="row">
+        <div style="flex: 1;">
+            <label>送信回数</label>
+            <input type="number" id="count" value="5" min="1">
+        </div>
+        <div style="flex: 1;">
+            <label>間隔 (ミリ秒)</label>
+            <input type="number" id="interval" value="1000" min="100">
+        </div>
+    </div>
+
+    <button id="sendBtn">送信開始</button>
+
+    <div id="log">ログがここに表示されます...</div>
+
+    <script>
+        const logDiv = document.getElementById('log');
+        const sendBtn = document.getElementById('sendBtn');
+
+        function addLog(text, isError = false) {
+            const time = new Date().toLocaleTimeString();
+            const div = document.createElement('div');
+            div.className = isError ? 'error' : 'success';
+            div.textContent = `[${time}] ${text}`;
+            logDiv.prepend(div);
+        }
+
+        async function sendWebhook() {
+            const url = document.getElementById('webhookUrl').value.trim();
+            const name = document.getElementById('username').value.trim();
+            const message = document.getElementById('message').value;
+            const count = parseInt(document.getElementById('count').value);
+            const interval = parseInt(document.getElementById('interval').value);
+
+            if (!url) {
+                alert('Webhook URLを入力してください');
+                return;
+            }
+
+            sendBtn.disabled = true;
+            logDiv.innerHTML = "";
+            addLog("--- 送信開始 ---");
+
+            for (let i = 0; i < count; i++) {
+                // 送信データの作成
+                const payload = { content: message };
+                if (name) {
+                    payload.username = name; // 名前の指定がある場合に追加
+                }
+
+                try {
+                    const response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+
+                    if (response.ok) {
+                        addLog(`${i + 1}件目: 送信成功`);
+                    } else if (response.status === 429) {
+                        addLog(`制限中: レート制限がかかりました。`, true);
+                    } else {
+                        addLog(`エラー: ステータス ${response.status}`, true);
+                    }
+                } catch (error) {
+                    addLog(`失敗: ${error.message}`, true);
+                    break;
+                }
+
+                if (i < count - 1) {
+                    await new Promise(resolve => setTimeout(resolve, interval));
+                }
+            }
+
+            addLog("--- 完了 ---");
+            sendBtn.disabled = false;
+        }
+
+        sendBtn.addEventListener('click', sendWebhook);
+    </script>
+</body>
+</html>
